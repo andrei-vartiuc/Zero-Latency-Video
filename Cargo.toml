@@ -1,0 +1,52 @@
+[package]
+name = "zero-latency-video"
+version = "0.1.0"
+edition = "2021"
+description = "Bibliothèque de streaming vidéo zero-latence pour macOS (ScreenCaptureKit, VideoToolbox, WebRTC)"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["webrtc", "videotoolbox", "screencapturekit", "macos", "streaming"]
+categories = ["multimedia::encoding", "network-programming", "os::macos-apis"]
+
+[dependencies]
+# Gestion d'erreurs
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Concurrence asynchrone et serveur Web
+tokio = { version = "1.36", features = ["full"] }
+axum = "0.7"
+
+# Gestion des buffers Zero-Copy
+bytes = "1.5"
+
+# Channel lock-free sync+async — remplace tokio::sync::mpsc dans la hot path VT→réseau.
+# Avantage clé : try_send() depuis le callback C (sync) et recv_async() depuis tokio (async),
+# sans overhead de Mutex.
+flume = "0.11"
+
+# ArrayQueue lock-free pour le pool de buffers (crossbeam_queue::ArrayQueue)
+crossbeam-queue = "0.3"
+
+# Dépendances macOS natives (ScreenCaptureKit, VideoToolbox, CoreMedia, etc.)
+objc2 = "0.5"
+objc2-foundation = "0.3"
+objc2-core-media = "0.3"
+objc2-core-video = "0.3"
+
+# Wrapper existant pour SCK
+screencapturekit = "0.2"
+
+# Transport réseau WebRTC
+webrtc = "0.17.1"
+
+# Observabilité
+tracing = "0.1"
+image = "0.25.10"
+tracing-subscriber = "0.3.23"
+videotoolbox = "0.18.0"
+base64 = "0.22.1"
+serde_json = "1.0.150"
+serde = { version = "1.0", features = ["derive"] }
+async-trait = "0.1.89"
+libc = "0.2.186"

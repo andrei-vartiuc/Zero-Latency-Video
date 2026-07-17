@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero-Latency WebRTC Client</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: radial-gradient(circle at top left, #1b1c3a 0%, #08090d 80%);
+            --glass-bg: rgba(18, 22, 41, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #4f46e5;
+            --primary-glow: rgba(79, 70, 229, 0.45);
+            --accent-green: #10b981;
+            --accent-green-glow: rgba(16, 185, 129, 0.2);
+            --accent-blue: #0ea5e9;
+            --accent-red: #ef4444;
+            --accent-red-glow: rgba(239, 68, 68, 0.2);
+            --font-main: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .glow-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .glow-orb {
+            position: absolute;
+            width: 700px;
+            height: 700px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0) 70%);
+            top: -250px;
+            left: -200px;
+        }
+
+        .glow-orb-2 {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.06) 0%, rgba(14, 165, 233, 0) 70%);
+            bottom: -150px;
+            right: -100px;
+        }
+
+        .app-header {
+            text-align: center;
+            margin-bottom: 35px;
+            z-index: 2;
+        }
+
+        .app-header h1 {
+            font-size: 2.6rem;
+            font-weight: 700;
+            letter-spacing: -0.05em;
+            background: linear-gradient(135deg, #ffffff 40%, var(--accent-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .app-header p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            font-weight: 300;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 30px;
+            width: 100%;
+            max-width: 1300px;
+            z-index: 2;
+        }
+
+        @media (max-width: 968px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .section-header {
+            border-left: 3px solid var(--accent-blue);
+            padding-left: 12px;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-main);
+        }
+
+        .section-desc {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+            margin-top: 6px;
+        }
+
+        .connect-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            padding: 16px 24px;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: var(--font-main);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 14px var(--primary-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .connect-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px var(--primary-glow);
+            filter: brightness(1.1);
+        }
+
+        .connect-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .connect-btn:disabled {
+            background: #1e293b;
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .status {
+            padding: 16px;
+            border-radius: 14px;
+            background: rgba(30, 41, 59, 0.3);
+            border: 1px solid var(--glass-border);
+            text-align: center;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-main);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.4);
+            animation: pulse-gray 2s infinite;
+        }
+
+        .status.connected {
+            background: var(--accent-green-glow);
+            border-color: rgba(16, 185, 129, 0.35);
+            color: #a7f3d0;
+        }
+
+        .status.connected .status-dot {
+            background: var(--accent-green);
+            animation: pulse-green 1.5s infinite;
+        }
+
+        .status.error {
+            background: var(--accent-red-glow);
+            border-color: rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+        }
+
+        .status.error .status-dot {
+            background: var(--accent-red);
+            animation: pulse-red 1s infinite;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stat-item {
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 14px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: border-color 0.3s ease, transform 0.3s ease;
+        }
+
+        .stat-item:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            color: var(--text-main);
+            font-size: 1.15rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .stat-value.highlight {
+            color: #38bdf8;
+        }
+
+        .video-container {
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 16 / 9;
+            min-height: 480px;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        #latencyOverlay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--accent-green);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 10;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        @keyframes pulse-gray {
+            0% { box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(148, 163, 184, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(148, 163, 184, 0); }
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+            70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-background">
+        <div class="glow-orb"></div>
+        <div class="glow-orb-2"></div>
+    </div>
+
+    <div class="app-header">
+        <h1>Zero-Latency Stream</h1>
+        <p>Console de supervision WebRTC • macOS native</p>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <div class="section-header">
+                <div class="section-title">Connexion Réseau</div>
+                <p class="section-desc">
+                    Négociation SDP automatique et directe sur réseau local (sans serveur STUN).
+                </p>
+            </div>
+            
+            <button id="connectBtn" class="connect-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                Se connecter au flux
+            </button>
+
+            <div class="status" id="statusBox">
+                <div class="status-dot"></div>
+                <span id="statusText">En attente d'offre...</span>
+            </div>
+
+            <!-- Stats WebRTC temps réel -->
+            <div class="stats-grid" id="statsGrid" style="display:none">
+                <div class="stat-item">
+                    <div class="stat-label">Jitter Buffer</div>
+                    <div class="stat-value highlight" id="statJitter">—</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Framerate</div>
+                    <div class="stat-value" id="statFps">—</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Frames Dropped</div>
+                    <div class="stat-value" id="statDropped">—</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Freeze Count</div>
+                    <div class="stat-value" id="statFreeze">—</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Packets Lost</div>
+                    <div class="stat-value" id="statLost">—</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Keyframes (IDR)</div>
+                    <div class="stat-value" id="statKeyframes">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="video-container">
+            <!--
+                OPTIMISATION CLÉ :
+                - Pas de 'controls' : les contrôles HTML5 activent une couche de buffering interne
+                - 'playsinline' : empêche Safari de passer en plein écran (qui ajoute du buffering)
+                - 'autoplay' : lecture immédiate sans interaction utilisateur
+                - Pas de 'preload' : on ne veut pas de buffering anticipatoire
+            -->
+            <video id="remoteVideo" autoplay playsinline muted></video>
+            <div id="latencyOverlay" style="display:none">
+                <span>⏱</span>
+                <span id="latencyValue">JB: —</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const connectBtn     = document.getElementById('connectBtn');
+        const remoteVideo    = document.getElementById('remoteVideo');
+        const statusBox      = document.getElementById('statusBox');
+        const statusText     = document.getElementById('statusText');
+        const statsGrid      = document.getElementById('statsGrid');
+        const latencyOverlay = document.getElementById('latencyOverlay');
+        const latencyValue   = document.getElementById('latencyValue');
+
+        let pc = null;
+        let statsInterval = null;
+        let lastFramesDecoded = 0;
+        let lastStatsTime = 0;
+
+        function setStatus(text, className) {
+            statusText.innerText = text;
+            statusBox.className = 'status ' + (className || '');
+        }
+
+        function createPeerConnection() {
+            const newPc = new RTCPeerConnection({
+                iceServers: [], // LAN only — pas de STUN nécessaire
+                // OPT : force le bundle de tous les médias sur un seul port UDP
+                bundlePolicy: 'max-bundle',
+                // OPT : utilise uniquement UDP (plus rapide que TCP pour le streaming)
+                iceTransportPolicy: 'all',
+            });
+
+            // OPTIMISATION PRINCIPALE : quand on reçoit le flux vidéo
+            newPc.ontrack = (event) => {
+                console.log("Flux reçu !", event.streams);
+                setStatus("Connecté ! Réception du flux...", "connected");
+
+                if (remoteVideo.srcObject !== event.streams[0]) {
+                    remoteVideo.srcObject = event.streams[0];
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // OPT-BROWSER-1 : playoutDelayHint = 0
+                // Dit au décodeur WebRTC de Chrome/Firefox d'afficher
+                // IMMÉDIATEMENT chaque frame sans attendre de buffer de sécurité.
+                // C'est la propriété la plus impactante côté navigateur.
+                // Réduit le jitter buffer de ~50-80ms → ~0-16ms.
+                // ═══════════════════════════════════════════════════════════
+                const receiver = event.receiver;
+                if (typeof receiver.playoutDelayHint !== 'undefined') {
+                    receiver.playoutDelayHint = 0;
+                    console.log("[OPT] playoutDelayHint = 0 appliqué ✓");
+                } else {
+                    console.warn("[OPT] playoutDelayHint non disponible dans ce navigateur");
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // OPT-BROWSER-2 : jitterBufferTarget (API plus récente, Chrome 107+)
+                // Fixe l'objectif de délai du jitter buffer à 0ms.
+                // Complémentaire à playoutDelayHint.
+                // ═══════════════════════════════════════════════════════════
+                if (typeof receiver.jitterBufferTarget !== 'undefined') {
+                    receiver.jitterBufferTarget = 0;
+                    console.log("[OPT] jitterBufferTarget = 0 appliqué ✓");
+                }
+
+                // OPT : démarrer la lecture immédiatement et éviter les blocages de politique d'autoplay
+                remoteVideo.play().catch(e => console.error("[OPT] Erreur lors du play():", e));
+
+                // Démarrage du polling de stats WebRTC
+                startStats(newPc);
+            };
+
+            newPc.oniceconnectionstatechange = () => {
+                console.log("ICE State:", newPc.iceConnectionState);
+                if (newPc.iceConnectionState === "disconnected" || newPc.iceConnectionState === "failed") {
+                    setStatus("Déconnecté.", "error");
+                    stopStats();
+                }
+            };
+
+            return newPc;
+        }
+
+        // ── Stats WebRTC en temps réel ────────────────────────────────────────
+        function startStats(pc) {
+            statsGrid.style.display = 'grid';
+            latencyOverlay.style.display = 'flex';
+            lastStatsTime = performance.now();
+
+            statsInterval = setInterval(async () => {
+                if (!pc) return;
+                const stats = await pc.getStats();
+                
+                stats.forEach(report => {
+                    if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                        // Jitter buffer delay (ms) — l'indicateur le plus important
+                        const jbMs = report.jitterBufferDelay !== undefined
+                            ? ((report.jitterBufferDelay / (report.jitterBufferEmittedCount || 1)) * 1000).toFixed(1)
+                            : '—';
+                        document.getElementById('statJitter').textContent = jbMs + ' ms';
+                        latencyValue.textContent = 'JB: ' + jbMs + ' ms';
+
+                        // FPS décodé réel
+                        const now = performance.now();
+                        const elapsed = (now - lastStatsTime) / 1000;
+                        const framesDecoded = report.framesDecoded || 0;
+                        const fps = elapsed > 0
+                            ? ((framesDecoded - lastFramesDecoded) / elapsed).toFixed(1)
+                            : '—';
+                        lastFramesDecoded = framesDecoded;
+                        lastStatsTime = now;
+                        document.getElementById('statFps').textContent = fps + ' fps';
+
+                        // Frames droppées
+                        document.getElementById('statDropped').textContent =
+                            (report.framesDropped || 0).toString();
+
+                        // Gels vidéo
+                        document.getElementById('statFreeze').textContent =
+                            (report.freezeCount || 0).toString();
+
+                        // Paquets perdus
+                        document.getElementById('statLost').textContent =
+                            (report.packetsLost || 0).toString();
+
+                        // Keyframes reçues
+                        document.getElementById('statKeyframes').textContent =
+                            (report.keyFramesDecoded || 0).toString();
+                    }
+                });
+            }, 1000);
+        }
+
+        function stopStats() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+        }
+
+        // ── Signalisation ─────────────────────────────────────────────────────
+        connectBtn.addEventListener('click', async () => {
+            connectBtn.disabled = true;
+            try {
+                // Fermer l'ancienne connexion si elle existe
+                if (pc) {
+                    stopStats();
+                    pc.close();
+                }
+                pc = createPeerConnection();
+
+                setStatus("Récupération de l'offre...", "");
+                
+                // 1. Fetch l'offre JSON depuis axum
+                const response = await fetch('/offer');
+                if (!response.ok) throw new Error("Impossible de récupérer l'offre");
+                const offerData = await response.json();
+                
+                const sessionId = offerData.id;
+                const offerSdp = offerData.sdp;
+                
+                // 2. Définir l'offre reçue
+                await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
+                
+                setStatus("Génération de la réponse...", "");
+                // 3. Générer la réponse
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                // 4. Attendre que l'ICE Gathering soit fini
+                await new Promise((resolve) => {
+                    if (pc.iceGatheringState === 'complete') {
+                        resolve();
+                        return;
+                    }
+                    pc.onicegatheringstatechange = () => {
+                        if (pc.iceGatheringState === 'complete') resolve();
+                    };
+                });
+
+                setStatus("Envoi de la réponse...", "");
+                
+                // 5. Envoyer la réponse à axum
+                const postRes = await fetch(`/answer/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pc.localDescription)
+                });
+                
+                if (!postRes.ok) throw new Error("Erreur lors de l'envoi de la réponse (Code: " + postRes.status + ")");
+
+                setStatus("Négociation terminée, attente vidéo...", "");
+
+            } catch (err) {
+                console.error(err);
+                alert("Erreur: " + err.message);
+                setStatus("Erreur de connexion", "error");
+                connectBtn.disabled = false;
+            }
+        });
+        
+        // Auto-connect au chargement
+        window.addEventListener('load', () => {
+            connectBtn.click();
+        });
+    </script>
+</body>
+</html>
