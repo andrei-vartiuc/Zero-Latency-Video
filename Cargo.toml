@@ -7,8 +7,8 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 keywords = ["webrtc", "videotoolbox", "screencapturekit", "macos", "streaming"]
 categories = ["multimedia::encoding", "network-programming", "os::macos-apis"]
-repository = "https://github.com/android-varx/Zero-Latency-Video"
-homepage = "https://github.com/android-varx/Zero-Latency-Video"
+repository = "https://github.com/andrei-vartiuc/Zero-Latency-Video"
+homepage = "https://github.com/andrei-vartiuc/Zero-Latency-Video"
 documentation = "https://docs.rs/zero-latency-video"
 
 [package.metadata.docs.rs]
