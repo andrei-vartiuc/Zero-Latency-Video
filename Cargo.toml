@@ -1,6 +1,6 @@
 [package]
 name = "zero-latency-video"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Bibliothèque de streaming vidéo zero-latence pour macOS (ScreenCaptureKit, VideoToolbox, WebRTC)"
 license = "MIT OR Apache-2.0"
